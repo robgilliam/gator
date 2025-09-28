@@ -1,13 +1,19 @@
 package main
 
 import (
-	"fmt"
+	"database/sql"
 	"log"
 	"os"
 
-	"github.com/robgilliam/gator/internal/command"
+	_ "github.com/lib/pq"
 	"github.com/robgilliam/gator/internal/config"
+	"github.com/robgilliam/gator/internal/database"
 )
+
+type state struct {
+	db  *database.Queries
+	cfg *config.Config
+}
 
 func main() {
 	cfg, err := config.Read()
@@ -15,30 +21,34 @@ func main() {
 		log.Fatalf("error reading config: %v", err)
 	}
 
-	state := command.State{
-		Config: cfg,
+	db, err := sql.Open("postgres", cfg.DbUrl)
+	if err != nil {
+		log.Fatalf("error connecting to db: %v", err)
+	}
+	defer db.Close()
+
+	dbQueries := database.New(db)
+
+	programState := &state{
+		db:  dbQueries,
+		cfg: &cfg,
 	}
 
-	commands := command.Commands{
-		Commands: make(map[string]func(*command.State, command.Command) error),
+	cmds := commands{
+		registeredCommands: make(map[string]func(*state, command) error),
 	}
 
-	commands.Register("login", handlerLogin)
+	cmds.register("login", handlerLogin)
+	cmds.register("register", handlerRegister)
 
-	args := os.Args
-
-	if len(args) < 2 {
-		fmt.Printf("Usage: %s <command> [<args>]\n", args[0])
-		os.Exit(1)
+	if len(os.Args) < 2 {
+		log.Fatalf("Usage: gator <command> [args...]\n")
 	}
 
-	cmd := command.Command{
-		Name: args[1],
-		Args: args[2:],
-	}
+	cmdName := os.Args[1]
+	cmdArgs := os.Args[2:]
 
-	if err = commands.Run(&state, cmd); err != nil {
-		fmt.Printf("%s\n", err)
-		os.Exit(1)
+	if err = cmds.run(programState, command{Name: cmdName, Args: cmdArgs}); err != nil {
+		log.Fatal(err)
 	}
 }
