@@ -9,6 +9,27 @@ import (
 	"github.com/robgilliam/gator/internal/database"
 )
 
+func handlerLogin(s *state, cmd command) error {
+	if len(cmd.Args) != 1 {
+		return fmt.Errorf("usage: %s <name>", cmd.Name)
+	}
+
+	name := cmd.Args[0]
+
+	_, err := s.db.GetUser(context.Background(), name)
+	if err != nil {
+		return fmt.Errorf("couldn't find user '%s': %w", name, err)
+	}
+
+	err = s.cfg.SetUser(name)
+	if err != nil {
+		return fmt.Errorf("couldn't set current user '%s': %w", name, err)
+	}
+
+	fmt.Printf("User switched successfully!\n")
+	return nil
+}
+
 func handlerRegister(s *state, cmd command) error {
 	if len(cmd.Args) != 1 {
 		return fmt.Errorf("usage: %s <name>", cmd.Name)
@@ -24,13 +45,13 @@ func handlerRegister(s *state, cmd command) error {
 	})
 
 	if err != nil {
-		return fmt.Errorf("couldn't create user: %w", err)
+		return fmt.Errorf("couldn't create user '%s': %w", name, err)
 	}
 
 	err = s.cfg.SetUser(name)
 
 	if err != nil {
-		return fmt.Errorf("couldn't set current user: %w", err)
+		return fmt.Errorf("couldn't set current user '%s': %w", name, err)
 	}
 
 	fmt.Printf("User created successfully:\n")
@@ -39,24 +60,15 @@ func handlerRegister(s *state, cmd command) error {
 	return nil
 }
 
-func handlerLogin(s *state, cmd command) error {
-	if len(cmd.Args) != 1 {
-		return fmt.Errorf("usage: %s <name>", cmd.Name)
+func handlerReset(s *state, cmd command) error {
+	if len(cmd.Args) != 0 {
+		return fmt.Errorf("usage: %s", cmd.Name)
 	}
 
-	name := cmd.Args[0]
-
-	_, err := s.db.GetUser(context.Background(), name)
-	if err != nil {
-		return fmt.Errorf("couldn't find user: %w", err)
+	if err := s.db.DropUsers(context.Background()); err != nil {
+		return fmt.Errorf("couldn't reset user database: %w", err)
 	}
 
-	err = s.cfg.SetUser(name)
-	if err != nil {
-		return fmt.Errorf("couldn't set current user: %w", err)
-	}
-
-	fmt.Printf("User switched successfully!\n")
 	return nil
 }
 
