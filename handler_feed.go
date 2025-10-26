@@ -110,3 +110,25 @@ func handlerFollowing(s *state, cmd command, user database.User) error {
 
 	return nil
 }
+
+func handlerUnfollow(s *state, cmd command, user database.User) error {
+	if len(cmd.Args) != 1 {
+		return fmt.Errorf("usage: %s <url>", cmd.Name)
+	}
+
+	feed, err := s.db.GetFeedByUrl(context.Background(), cmd.Args[0])
+	if err != nil {
+		return fmt.Errorf("no feed for url '%s': %w", cmd.Args[0], err)
+	}
+
+	err = s.db.DestroyFeedFollow(context.Background(), database.DestroyFeedFollowParams{
+		FeedID: feed.ID,
+		UserID: user.ID,
+	})
+
+	if err != nil {
+		return fmt.Errorf("couldn't destroy feed follow for current user '%s' and url '%s': %w", user.Name, feed.Url, err)
+	}
+
+	return nil
+}
